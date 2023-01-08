@@ -1,5 +1,7 @@
 
 import pygame as pg
+import numpy as np
+
 from random import *
 from Block import *
 from Bomb import *
@@ -9,138 +11,193 @@ from constants import *
 
 class Game:
 
-  def draw_text(surf, text, size, x, y):
+  def __init__(self):
+    pg.init()
+    pg.mixer.init()
+    pg.joystick.init()
+    pg.display.set_caption("Pygame Framework")
+
+    self.screen = pg.display.set_mode((WIDTH,HEIGHT))
+    self.clock = pg.time.Clock()
+    self.start_ticks=pg.time.get_ticks()
+    self.running = False
+    self.score = 0
+    self.topScore = 0
+    self.all_objects = pg.sprite.Group()
+    self.all_bombs = pg.sprite.Group()
+    self.all_blocks = pg.sprite.Group()
+    self.all_fires = pg.sprite.Group()
+    self.joystick_count = pg.joystick.get_count()
+    self.joybuttons = pg.joystick.Joystick(0).get_numbuttons()
+
+
+  def draw_text(self, surf, text, size, x, y):
     font = pg.font.Font(pg.font.match_font('arial'), size)
     text_surface = font.render(text, True, (150,150,250))
     text_rect = text_surface.get_rect()
     text_rect.midtop = (x, y)
     surf.blit(text_surface, text_rect)
-  
-  pg.init()
-  pg.mixer.init()
-  screen = pg.display.set_mode((WIDTH,HEIGHT))
 
-  pg.joystick.init()
-  joystick_count = pg.joystick.get_count()
-  joybuttons = pg.joystick.Joystick(0).get_numbuttons()
 
-  pg.display.set_caption("Pygame Framework")
-  clock = pg.time.Clock()
+  def get_input(self,player):
 
-  all_objects = pg.sprite.Group()
-  all_bombs = pg.sprite.Group()
-  all_blocks = pg.sprite.Group()
-  all_fires = pg.sprite.Group()
+    for j in range( 0, self.joystick_count, 1 ):
+      for i in range( 0, self.joybuttons, 1 ):
+        if pg.joystick.Joystick(j).get_button(i) :
+          player.button(i%4+5)
+    keys = pg.key.get_pressed()
+    player.moveX(pg.joystick.Joystick(0).get_axis(0)*-1+keys[pg.K_LEFT]+keys[pg.K_a]+keys[pg.K_RIGHT]*-1+keys[pg.K_d]*-1)
+    player.moveY(pg.joystick.Joystick(0).get_axis(1)*-1+keys[pg.K_UP  ]+keys[pg.K_w]+keys[pg.K_DOWN ]*-1+keys[pg.K_s]*-1)
+    for event in pg.event.get():
+      if event.type == pg.QUIT:
+        pg.quit()
+        running = False
+      if event.type == pg.MOUSEBUTTONDOWN:
+        print('clicked '+ str(pg.mouse.get_pos()))
+        return 1 
+    if keys[pg.K_LALT] or keys[pg.K_RALT]:
+      player.button(5)
+    if keys[pg.K_LCTRL] or keys[pg.K_RCTRL]:
+      player.button(6)
+    if keys[pg.K_SPACE]:
+      player.button(7)
+    if keys[pg.K_x]:
+      player.button(8)
+    if keys[pg.K_RETURN]:
+      pass # open menu
 
-  all_objects.add(all_bombs,all_blocks,all_fires)
-  player = Player((WIDTH/2,HEIGHT/2),(200,200,200))
-  all_objects.add(player)
 
-  score = 0
+  def get_input_menu(self):
 
-    # list of things to spawn next frame
-    # objects making other objects in pygame is a bitch
-    # this work-around uses a return value the update() method on every sprite
-  spawn = []
-  start_ticks=pg.time.get_ticks()
-
-  # main loop
-
-  running = True
-  while running:
-
-  # --------  controls -------------------
-
+    for j in range( 0, self.joystick_count, 1 ):
+      for i in range( 0, self.joybuttons, 1 ):
+        if pg.joystick.Joystick(j).get_button(i) :
+          if i >=4:
+            return 1
     keys = pg.key.get_pressed()
     for event in pg.event.get():
       if event.type == pg.QUIT:
+        pg.quit()
         running = False
-
       if event.type == pg.MOUSEBUTTONDOWN:
         print('clicked '+ str(pg.mouse.get_pos()))
+        return 1
+    if keys[pg.K_RETURN]:
+      return 1
 
-      for j in range( 0, joystick_count, 1 ):
-        for i in range( 0, joybuttons, 1 ):
-          if pg.joystick.Joystick(j).get_button(i) :
-            score -= 1
-            player.button(i)
-      if keys[pg.K_LALT] or keys[pg.K_RALT]:
-        score -= 1
-        player.button(0)
-      if keys[pg.K_LCTRL] or keys[pg.K_RCTRL]:
-        score -= 1
-        player.button(1)
-      if keys[pg.K_SPACE]:
-        score -= 1
-        player.button(2)
-      if keys[pg.K_RETURN]:
-        score -= 1
-        player.button(3)
 
-    player.moveX(pg.joystick.Joystick(0).get_axis(0)*-1+keys[pg.K_LEFT]+keys[pg.K_a]+keys[pg.K_RIGHT]*-1+keys[pg.K_d]*-1)
-    player.moveY(pg.joystick.Joystick(0).get_axis(1)*-1+keys[pg.K_UP  ]+keys[pg.K_w]+keys[pg.K_DOWN ]*-1+keys[pg.K_s]*-1)
+  def show_start_screen(self):
 
-    for i in range(joystick_count):
+    self.draw_text(self.screen, 'Press enter for new game', 40, WIDTH/2, HEIGHT/2-100)
+    self.draw_text(self.screen, 'Previous score: '+str(self.score), 30, WIDTH/2, HEIGHT/2)
+    self.draw_text(self.screen, 'Top score: '+str(self.topScore), 30, WIDTH/2, HEIGHT/2+40)
+
+    for i in range(self.joystick_count):
       joystick = pg.joystick.Joystick(i)
       joystick.init()
-        
-  # --------  end controls -------------------
+    waiting = True
+    while waiting:
+      pg.display.flip()
+      player = Player((-100,-100),(200,200,200))
+      if self.get_input_menu():
+        self.new_game()
+
+       
+  def spawn_blocks(self):
+    self.timer=(pg.time.get_ticks()-self.start_ticks)
+    if self.timer > 100 and self.timer % 20 == 0 and len(self.all_blocks) < 10+abs(self.score/10):
+      self.spawn.append(['Block',randint(0,WIDTH),-30,randint(-30,30)*0.1,1])
 
 
-    # spawn blocks above player randomly
-    timer=(pg.time.get_ticks()-start_ticks)
-    if timer > 100 and timer % 20 == 0 and len(all_blocks) < 10+int(score/10):
-      spawn.append(['Block',randint(0,WIDTH),-30,randint(-30,30)*0.1,1])
-
-
-    # collisions
-    for block in all_blocks:
-      hitFire = pg.sprite.spritecollideany(block, all_fires)
-      hitBomb = pg.sprite.spritecollideany(block, all_bombs)
+  def look_for_collisions(self,player):
+    for block in self.all_blocks:
+      hitFire = pg.sprite.spritecollideany(block, self.all_fires)
+      hitBomb = pg.sprite.spritecollideany(block, self.all_bombs)
       if hitFire:
-        score += 3
+        self.score += 3
         block.die()
       if hitBomb:
-        score += 10
+        self.score += 10
+
+        cMajor = [261,293,329,349,392,440,493,523,587,659,698,784,880,987,1046]
+        pg.mixer.Sound(np.sin(2 * np.pi * np.arange(10000) * choice(cMajor) / 44100).astype(np.float32)).play(0).set_volume(0.08)
+
         block.die()
         hitBomb.die()
-
-    hitBlock = pg.sprite.spritecollideany(player, all_blocks)
+    hitBlock = pg.sprite.spritecollideany(player, self.all_blocks)
     if hitBlock:
       hitBlock.die()
+      self.playerHealth -= 10
       player.takeHit()
       pass
 
 
-    # using return value of all_objects.update() to spawn everything
-    if spawn:
-      for arr in spawn:
+  def spawner_func(self):
+    if self.spawn:
+      for arr in self.spawn:
         if arr[0] == 'Block':
           block = Block(arr[1],arr[2],arr[3],arr[4])
-          all_blocks.add(block)
-          all_objects.add(block)
+          self.all_blocks.add(block)
+          self.all_objects.add(block)
         if arr[0] == 'Bomb':
           bomb = Bomb(arr[1],arr[2],arr[3],arr[4])
-          all_bombs.add(bomb)
-          all_objects.add(bomb)
+          self.all_bombs.add(bomb)
+          self.all_objects.add(bomb)
         if arr[0] == 'Fire':
           fire = Fire(arr[1],arr[2],arr[3],arr[4])
-          all_fires.add(fire)
-          all_objects.add(fire)
-      spawn = []
-
-    #Update
-    for obj in all_objects:
-      spawn.append(obj.update())
+          self.all_fires.add(fire)
+          self.all_objects.add(fire)
+        if arr[0] == 'GAMEOVER':
+          self.show_start_screen()
+      self.spawn = []
 
 
+  def update_all(self):
+    # Update
+    for obj in self.all_objects:
+      self.spawn.append(obj.update())    
+    # Add new objects
+    self.spawner_func()
     # Render
-    screen.fill((0,0,0))
-    all_objects.draw(screen)
-    draw_text(screen, str(score), 40, 30, 20 )
+    self.screen.fill((0,0,0))
+    self.all_objects.draw(self.screen)
+    self.draw_text(self.screen, 'Score: '+str(self.score), 40, 90, 10 )
+    self.draw_text(self.screen, 'Health: '+str(self.playerHealth), 40, 90, 60 )
 
     pg.display.flip()
-    clock.tick(FPS)
+    self.clock.tick(FPS)
 
-Game()
+
+  def new_game(self):
+    self.running = True
+    self.all_objects.empty()
+    self.all_bombs.empty()
+    self.all_blocks.empty()
+    self.all_fires.empty()
+    player = Player((WIDTH/2,HEIGHT/2),(200,200,200))
+    self.all_objects.add(player)
+    self.score = 0
+    self.playerHealth = 100
+    self.spawn = []
+
+    for i in range(self.joystick_count):
+      joystick = pg.joystick.Joystick(i)
+      joystick.init()
+
+    while self.running:
+      self.get_input(player)
+      self.spawner_func()
+      self.spawn_blocks()
+      self.look_for_collisions(player)
+      self.update_all()
+      if self.playerHealth <= 0:
+        self.running = False
+        if self.score > self.topScore:
+           self.topScore = self.score
+        g.show_start_screen()
+
+
+g = Game()
+g.show_start_screen()
+
 pg.quit()
