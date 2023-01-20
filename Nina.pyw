@@ -2,6 +2,7 @@
 import pygame as pg
 from random import *
 
+from data.toon import *
 from data.player import *
 from data.globals import *
 
@@ -49,6 +50,7 @@ class Game:
         running = False
       if event.type == pg.MOUSEBUTTONDOWN:
         print('clicked '+ str(pg.mouse.get_pos()))
+        self.new_game()
         return 1 
     if keys[pg.K_LALT] or keys[pg.K_RALT]:
       player.button(5)
@@ -93,7 +95,6 @@ class Game:
     waiting = True
     while waiting:
       pg.display.flip()
-      player = Player((-100,-100),(200,200,200))
       if self.get_input_menu():
         self.new_game()
 
@@ -155,6 +156,7 @@ class Game:
 
 
     self.all_objects.draw(self.screen)
+    for obj in self.all_objects: pg.draw.rect(self.screen, (200,200,200), obj.getRect(),  2)
     self.draw_text(self.screen, 'Score: '+str(self.score), 40, 90, 10 )
     self.draw_text(self.screen, 'Health: '+str(self.playerHealth), 40, 90, 60 )
 
@@ -166,7 +168,8 @@ class Game:
     self.running = True
     self.all_objects.empty()
     #self.all_bombs.empty()
-    player = Player((WIDTH/2,HEIGHT/2),(200,200,200))
+    choices = ['zombieboy' , 'zombiegirl' , 'ninjagirl']
+    player = Player((WIDTH/2,HEIGHT/2),choice(choices)) 
     self.all_objects.add(player)
     self.score = 0
     self.playerHealth = 100
